@@ -1,16 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using WebApplication9.Models;
 using WebApplication9.Services.Customers;
+using WebApplication9.Services.HealthCheck;
 using WebApplication9.Services.Orders;
 using WebApplication9.Services.Products;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
@@ -69,6 +68,10 @@ builder.Services.AddApiVersioning(options =>
     options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
 });
 
+builder.Services.AddHealthChecks()
+    .AddCheck<MyCustomHealthCheck>("my_custom_health_check")
+    .AddCheck<MySecondHealthCheck>("my_second_health_check");
+
 var app = builder.Build();
 
 app.UseAuthentication();
@@ -90,9 +93,24 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+app.UseRouting();
 
-app.MapControllers();
+app.UseAuthorization();
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapHealthChecks("/health1", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+    {
+        Predicate = (check) => check.Name == "my_custom_health_check_1"
+    });
+
+    endpoints.MapHealthChecks("/health2", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+    {
+        Predicate = (check) => check.Name == "my_custom_health_check_2"
+    });
+
+    endpoints.MapControllers();
+});
+
 
 app.Map("/login/{username}", (string username) =>
 {
